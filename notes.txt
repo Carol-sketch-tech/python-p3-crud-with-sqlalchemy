@@ -1,0 +1,456 @@
+Objectives.
+    1.use an external library to simplify tasks from earlier ORM lessons.
+    2. Use SQLAlchemy to create, read, update and delete records in a sql database.
+
+CREATE, READ, UPDATE and DELETE WITH SQLALCHEMY.
+we have already created and perssited database schema using SQLAlchemy. 
+This required us to define classes that inherited from a common declarative_base object and that possessed certain attributs that 
+would be used to assign a table name, columns Primary keys and more.
+
+run the following command to make the code executable.
+    chmod +x app/sqlalchemy_sandbox.py
+
+
+THE SESSION.
+sqlalchemy interacts witht he databse through sessions.
+these wrap engine objects like the one we included in our script. the session contains an identity map, which is similar to an empty dictionary with keys for the table name, columns and primary keys.
+the session contain an identity map that is similar to an empty dictionary with keys for the table name, columns and primarykeys.
+when the session pull the data from stident.db, if fills the identity map and uses it to populate a student object with specific attribute values.
+when it commits data to the database, it fills the identity map in the same fashion but unpacks it inot a students row instead.
+
+    SESSIONMAKER.
+        to create a session we have to use sqlalchemy sessionmaker class. 
+        this ensures that their is consistent identity map for the duration ofour session.
+        to create the session, we import the sessionmaker from sqlalchemy.ORM
+            from sqlalchemy.orm import sessionmaker.
+
+        note that we use our engine to configure a session' class.
+        and we use sessino class to create session object.
+
+
+TRANSACTION.
+transactions are a strategy for sql statements to be executed through ORM that ensure that they all succed or fail as a group.
+this is important id the statements that occur later on depend on earlier statemetns executing properly.
+the worfflow for transactions is as follows:
+
+        Transaction begin.
+                |
+                |
+                |
+        DB state recorded
+                |
+                |
+                |
+        SQL statement
+                |
+                |
+                |
+         SQL statement
+                |
+                |
+                |
+        SQL statement
+                |
+                |
+                |
+        Transaction committed.        
+
+if any of the SQL statements in the above image workflow fail the database will be rolled 
+back to the state recorded at the beggining of the transaction and the process will end, returning an error message.
+
+REFACTORING OUR SCHEMA.
+Building on the Student model 
+
+        #!/usr/bin/env python3
+
+# imports
+
+class Student(Base):
+    __tablename__ = 'students'
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            'id',
+            name='id_pk'),
+        UniqueConstraint(
+            'email',
+            name='unique_email'),
+        CheckConstraint(
+            'grade BETWEEN 1 AND 12',
+            name='grade_between_1_and_12')
+    )
+
+    Index('index_name', 'name')
+
+    id = Column(Integer())
+    name = Column(String())
+    email = Column(String(55))
+    grade = Column(Integer())
+    birthday = Column(DateTime())
+    enrolled_date = Column(DateTime(), default=datetime.now())
+
+    def __repr__(self):
+        return f"Student {self.id}: " \
+            + f"{self.name}, " \
+            + f"Grade {self.grade}"
+CONSTRAINS
+Breaking down the new features in the Student model.
+    Along with keys, constrains help ensure that our data meets certain criteria before being stored in database.
+    Constrains are sotres in the optional __table_args__ class attribute.
+    there are three main classes of contraint:
+        1. PrimaryKeyConstraint -> assigns primary key status to a column.this can aslo be accomplished through the optional Primary_Key argument tot he Column class construtor.
+        2.UniqueConstraints -> checks new records to ensure that they do not match existing records at unique columns 
+        3. CheckConstraint uses the SQL statements to check if new values meet specific criteria.
+
+INDEXES.
+indexes are used to speed up lookups on certain column values.
+Since teachers and administrators dont typically know their students ID numbers off the top of their heads, its wise to set up an index for name in
+preparation for people using it in their database transactions.
+
+__repr__()
+all classes in python have a __repr__() instance method that determine their standard output value(i.e what you sese when you print () the object. )
+be default this shows the classname and an arbitrary ID.
+the default value is not very helpful in thelling ddifferent objects apart.
+
+INPUT SIZES, DEFAULTS AND MORE.
+SQLAlchemy provides a numbe rof other optional arguments in the column and datatype constructors that will allow you to make your code more specific and secure.
+
+CREATING RECORDS.
+To create a new student record in our database, we need to create an object using the student class. this syntax is the same as with intantiating any other python class.
+
+        #!/usr/bin/env python3
+
+from datetime import datetime
+
+from sqlalchemy import (create_engine, desc, func,
+    CheckConstraint, PrimaryKeyConstraint, UniqueConstraint,
+    Index, Column, DateTime, Integer, String)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+Base = declarative_base()
+
+class Student(Base):
+    __tablename__ = 'students'
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            'id',
+            name = 'id_pk'
+        ),
+        UniqueConstraint(
+            'email',
+            name= 'unique_email'
+        ),
+        CheckConstraint(
+            'grade BETWEEN 1 AND 12',
+            name = 'grade_between_1_and_12'
+        )
+    )
+    Index('index_name', 'name' )
+    id = Column(Integer(), primary_key=True)
+    name = Column(String())
+    email = Column(String(55))
+    grade = Column(Integer())
+    birthday = Column(DateTime())
+    enrolled_date = Column(DateTime(), default = datetime.now())
+
+if __name__ == '__main__':
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+
+    # we use the engine to configure a sessions class
+    Session = sessionmaker(bind=engine)
+    # and we use the session class to configure a session engine.
+    session = Session()
+
+    albert_einstein = Student (
+        name = 'Albert Einstein',
+        email = 'albert.einstain@zurich.edu',
+        grade = 6,
+        birthday = datetime(
+            year = 1953,
+            month= 3,
+            day = 14
+        ),
+    )
+    session.add(albert_einstein)
+    session.commit()
+
+    print(f'New student ID is {albert_einstein.id}.')
+
+the code block above is how you create records.
+
+
+what is we want to create multiple records in a single line of code, then we do the following :
+
+        # imports, models
+
+if __name__ == '__main__':
+
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    albert_einstein = Student(
+        name="Albert Einstein",
+        email="albert.einstein@zurich.edu",
+        grade=6,
+        birthday=datetime(
+            year=1879,
+            month=3,
+            day=14
+        ),
+    )
+
+    alan_turing = Student(
+        name="Alan Turing",
+        email="alan.turing@sherborne.edu",
+        grade=11,
+        birthday=datetime(
+            year=1912,
+            month=6,
+            day=23
+        ),
+    )
+
+    session.bulk_save_objects([albert_einstein, alan_turing])
+    session.commit()
+
+    print(f"New student ID is {albert_einstein.id}.")
+    print(f"New student ID is {alan_turing.id}.")
+
+.bulk_save_objects() do not associate the records with the seeion, so we do not update our records ID.
+
+READ RECORDS.
+There are many ways to structure a query in SQLalchemy, but they all ebgin with the sessions query() instance method.
+as follows :
+
+     if __name__ = '__main__':
+
+        # create session, student objects.
+
+        sessions.bulk_save_objects([albert_enistein, caroline_wanjiru])
+        session.commit()
+
+        students - session.query(Student)
+
+        print([student for student in students])
+note that the query method is used to retrieve data from a database.
+note that we would also see the same output using the all() instance method.
+as follows 
+          students = session.query(Student).all()
+                 the all() isntance method is used to retrive all matching records.
+                 matching reocrds in this context refer to the rows in a table that satisfy the conditions specified in the Query.
+                 for isntance when we use the filter() method, youre defining criteria that the records must meed to be included in the result set.
+
+                 note that the statement session.query(class name ) initiates a query on the class table in the database.
+                 mathcing records are thos that fulfil the condition you speficiy in your query.
+                 the criteria of defining conditions can include comparisions, logical conditions(AND, OR) and more, allowing you to filter data precislsy based on your requirements.
+
+                 the method that help make an object statandar out put human readable is hte __repr__()
+
+
+                 SELECTING ONLY CERTAIN COLUMNS
+                 by default the query() method returns complete records from the data model passed in as an argument.
+                 if we were only looking for certain fields, we can specify this in the arguments we pass to query().
+                 we do that as follows 
+                            if __name__ = '__main__':
+                             engine = create_engine('sqlite:///:my_database.db:')
+                             Base.metadata.create_all(engine)
+
+                             Session = sessionmaker(bind=engine)
+                             session = Session()
+
+                             caroline_wanjiru= Student(
+                                name = 'caroline',
+                                email = 'caroline.wanjiru@moringaschool.ac',
+                                grade = 7,
+                                birthday = datetime(
+                                    year =   2002,
+                                    month = 7,
+                                    day = 10                          ),
+                             )
+
+                             session.add(caroline)
+                             session.commit()
+
+                             session.query(caroline.name)
+                             caroline_birthday = [birthday for birthday in session.query(Caroline.birthday)]
+                             print(caroline_birthday)
+
+
+                ORDERING.
+                by default , results from nay databse query are ordered by their primary key.
+                the order_by() method allows us to sort by any column:
+
+                        if __name__ = '__main__':
+                        engine = create_engine('sqlite:///:mydatabase.bd:')
+                        Base.metadata.create_all(engine)
+
+                        Session= sessionmake(bind:engine)
+                        session = Session()
+
+                        #define an student object here 
+
+                        student_by_name = [studetnt for student in session.query(
+                            Student.name).order_by(
+                                Student.name
+                            )                        ]
+
+                        or 
+                         student_by_name_an_by_grade = [student for stundet in session.query(
+                            Student.anme, Student.grade).order_by(desc(Student.grade))
+                         ]
+                         print (student_by_nam_and_by_grade)
+ note that when we query a database table using query() method, it return records in the tuple data type.
+ also note that when using the desc in order_by() method it is a sort of sorting
+
+
+                LIMITING.
+                To limit your set to your first x records, you can use the limit() method.
+                     
+                     if __name__ = '__main__':
+                        engine = create_engine('sqlite:///:mydatabase:)
+                        Base.metadata.create_all(engine)
+
+                        # create session.
+                        Session = sessionmaker(bind=engine)
+                        session = Session()
+
+                        # create student objects
+
+                        # limit your set to the first x records. uisng the limit() method.
+
+                        oldest_student = [student for student in session.query(Student.name, Student.burthday).order_by(desc(Student.grade)).limit(1)]
+                        print(oldest_student)
+
+                note we can use the first() method instead of limit(1) as it i easier.
+                         oldest_student = session.query(
+            Student.name, Student.birthday).order_by(
+            desc(Student.grade)).first()
+
+
+
+explaniation for the code above:
+
+    1.Session.query(Student.name, Student.birthday);
+        -  this oart initiated a query on the Student table.
+        - it specified that you want to retrieve the name and birthdat columns from the Student table.
+    
+    2. .order_by(decs(Student.grade))
+        - this method orders the results by the grade column in descending order(hisherst grades first)
+        - the desc() function is sued to specify that you want the ordering to be descending.
+    3. limit(1)
+        - this method restricts the result set to only one record, effectively getting the top result after ordering.
+    4 [student for student in ...]:
+        - this is a lsit comprehesnison that iterates over the result of the querysince we are limiting the resuts to one this will
+        create a list containing one tupe with the name and birthday of the student with the highest grade.
+
+
+                FUNC
+                importing func from sqlalchemy gives us access to common SQL operations through functions like sum() and count().
+                As these operation act upon columns we carry them out through wrapping a column object passed to the query() method:
+                this is done as follows 
+
+                    if __name__ = '__main__':
+                    # create session and student object.
+
+                    student_count = session.query(func.count(Student.id)).first()
+                    print(student_count)
+
+                    it is best pracitce to call these fucntions func.operation() rather than their name alone becasue ,many of these fucntion have name conflics with fucntion in the python 
+                     library such as sum()
+                
+
+FILTERING 
+Retrieving specific records requires use of the filter() method. 
+A typical filter() statement has a column, a standard operator and a value.
+a typical filter statement has the following :
+        1. has column, 
+        2. a standard operator
+        3. a value
+
+it is possible to chain multiple filter() statement together though it is typcally easier to read with comma-seperated clauses instead of one filter() statement.
+as follows :
+    if __name__ = '__main__':
+
+        #create session and class attributes
+
+        query = session.query(Student).filter(Student.name.like('%Alan%'),
+        Student.grade == 11)
+
+        for record in query:
+            print(record.name)
+ 
+Overview of the filter method in SQLAlchemy
+this code snippet demonstrates how to query a databse for specific student records using the filter() method.
+the exaple int he code given . the filter method searches for stunedtn wjoce names contain 'Alan' and who are in the 11th grade.
+
+note that the line if __name__ = '__main__':
+this line ensures that the script is executed direclty and not when imported as a module.
+
+create session
+the comment suggest that a dataase session has already been created.
+ 
+ filter method allows us to specify condition that records must meet to be included in the results.
+    1. Student.name.like(%Alan%) this conditon checks if the name column contains the substring Alan.
+    the % symbols are wildcards in SQL allowinf for nay characters before or after Alan.
+
+    2. Student.grade == 11 - this conditon checks if the grade column is equal to 11.
+
+
+
+UPDATING DATA.
+there are several ways to update data using SQLALchemy ORM.
+the simplest way is to use python to modify objects directy and then commit those changes through the session.
+for instance, lets say that a new school year is starting and our studnet all need to be moved up a grade:
+
+    if __name__ = '__main__':
+        # create sessionf and define student objects.
+
+        # use filter methods and also make queried to the database tables.
+
+        for student in session.query(Student):
+            student.grade +=1
+
+        student.commit()
+
+        print([(student.name, student.grade) for student in session.query(Student)])
+
+The update() method allows us to update records without creatting objects beforehand.
+Here's how we would carry out the same statement with update()
+     
+     if __name__ = '__main__':
+     # creating session and defining student objects.
+
+     session.query(Student).update({
+        Student.grade: Student.grade + 1 
+     })
+
+    print([(student.name,student.grade) for studnet in session.query(Student)])
+
+DELETING DATA.
+to delete a record from your database, you can use the delete() method.
+if you have an onject in memory that you want to delete, you can call the delete() methodnon the object from your 
+session:
+
+        if __name__ = '__main__':
+        # defining Student and creating session
+
+        query = session.query(
+            Student).filter(
+                Student.name == "Albert Einstein")
+            
+        albert_einstein = query.first()
+
+        session.delete(albert_einstein)
+        session.commit()
+
+        albert_einstein = query.first()
+
+        print(albert_einstein)
+
+
+Note that session allows us to interact with databses through SQLAlchemy and that those interactions are grouped into the transactions.
+
